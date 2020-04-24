@@ -17,10 +17,10 @@ CRED_PKL_PATH = "token.pkl"
 
 # messages
 CHOOSE_TASKLIST_MSG = "now you will choose which task list you would like to manage using this app."
-CREATE_NEW_CALENDAT_MSG = "lets create a new calendar for that purpose."
+CREATE_NEW_CALENDAR_MSG = "lets create a new calendar for that purpose."
 ANSWER_INVALID_MSG = "you did not answer positively for any option."
 DONE_INITIAL_SETUP_MSG = "great! we are done with the initial setup."
-CHOOSE_CALENDAT_MSG = "now you will choose the calendar that this app will manage."
+CHOOSE_CALENDAR_MSG = "now you will choose the calendar that this app will manage."
 CREATE_NEW_TASKLST_MSG = "lets create a new task list then."
 
 # questions
@@ -53,7 +53,6 @@ def initial_credentials_setup():
     """
     get the credentials of the google calendar and google task and dump them into pickle.
     """
-# changes
     if not os.path.exists(CRED_PKL_PATH):
         scopes = [CALENDAR_SCOPE, TASKS_SCOPE]
         flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_JSON,
@@ -71,65 +70,106 @@ def get_writing_reading_calendars():
      writing calendar id :type string
      reading calendars ids :type: list of strings.
     """
-    print(CHOOSE_CALENDAT_MSG)
+    print(CHOOSE_CALENDAR_MSG)
     existing_calendars = util.services['calendar'].calendarList().list().execute()
     if util.get_boolean_answer(EXISTING_CALENDAR_Q):
-        write_calendar = None
-        reading_calendars = []
-        while not write_calendar:
-            for i in range(len(existing_calendars['items'])):
-                cal_id = existing_calendars['items'][i]['id']
-                name = existing_calendars['items'][i]['summary']
-
-                if not write_calendar:  # choose the write calendar
-                    if util.get_boolean_answer(MANAGE_THIS_CALENDAR_Q.format(calendar_name=name)):
-                        write_calendar = cal_id
-
-                else:   # write calendar already chosen
-                    reading_calendars.append(cal_id)
-
-            if not write_calendar:
-                print(ANSWER_INVALID_MSG)
+        reading_calendars, write_calendar = split_existing_calendars(existing_calendars)
     else:
-        print(CREATE_NEW_CALENDAT_MSG)
-        summary = input(NEW_CALENDAR_NAME_Q)
-        new_calendar = {
-            'summary': summary,
-            'timeZone': util.TIME_ZONE
-        }
-        write_calendar = util.services['calendar'].calendars().insert(body=new_calendar).execute()['id']
+        write_calendar = create_new_calendar()
         reading_calendars = [existing_calendars['items'][i]['id']
                              for i in range(len(existing_calendars['items']))]
-
     return write_calendar, reading_calendars
+
+
+def split_existing_calendars(existing_calendars):
+    """
+    split the existing calendars according to user's preferences.
+    the user chooses a writing calendar and the rest are reading calendars.
+    :param existing_calendars: all the calendars of the user. dictionary with an
+    'items' key that contains a list of dictionaries, each represents a calendar.
+    :return: writing calendar id :type string, reading calendars ids :type list of strings
+    """
+    write_calendar = None
+    reading_calendars = []
+    while not write_calendar:
+        for i in range(len(existing_calendars['items'])):
+            cal_id = existing_calendars['items'][i]['id']
+            name = existing_calendars['items'][i]['summary']
+
+            if not write_calendar:  # choose the write calendar
+                if util.get_boolean_answer(MANAGE_THIS_CALENDAR_Q.format(calendar_name=name)):
+                    write_calendar = cal_id
+
+            else:  # write calendar already chosen
+                reading_calendars.append(cal_id)
+
+        if not write_calendar:
+            print(ANSWER_INVALID_MSG)
+    return reading_calendars, write_calendar
+
+
+def create_new_calendar():
+    """
+    creates a new calendar in google calendar with the name that the user gives
+    and returns the new calendar's id.
+    :return: id of the new calendar :type string
+    """
+    print(CREATE_NEW_CALENDAR_MSG)
+    summary = input(NEW_CALENDAR_NAME_Q)
+    new_calendar = {
+        'summary': summary,
+        'timeZone': util.TIME_ZONE
+    }
+    write_calendar = util.services['calendar'].calendars().insert(body=new_calendar).execute()['id']
+
+    return write_calendar
 
 
 def get_main_task_lst_id():
     """
-    get the task list id. wither use an existing one or create a new one.
-    :return:
+    get the task list id. either use an existing one or create a new one.
+    :return: the chosen task list id.
     """
     print(CHOOSE_TASKLIST_MSG)
-    result = util.services['tasks'].tasklists().list().execute()
+    task_lists = util.services['tasks'].tasklists().list().execute()
     if util.get_boolean_answer(USE_EXISTING_TASKLST_Q):
-        main_task_lst_id = None
-
-        while not main_task_lst_id:
-            for taskList in result['items']:
-
-                if main_task_lst_id:
-                    break
-                if util.get_boolean_answer(MANAGE_THIS_LST_Q.format(list_title=taskList['title'])):
-                        main_task_lst_id = taskList['id']
-
-            if not main_task_lst_id:
-                print(ANSWER_INVALID_MSG)
+        main_task_lst_id = choose_task_list(task_lists)
     else:
-        print(CREATE_NEW_TASKLST_MSG)
-        title = input(NEW_TASKLST_NAME_Q)
-        new_task_lst = {'title': title}
-        main_task_lst_id = util.services['tasks'].tasklists().insert(body=new_task_lst).execute()['id']
+        main_task_lst_id = create_new_task_list()
 
+    return main_task_lst_id
+
+
+def choose_task_list(task_lists):
+    """
+    makes the user choose a task list from existing task lists.
+    :param task_lists: dict that has a 'items' key that contains a list of tasks lists (each one is a dictionary).
+    :return: id of the chosen task list.
+    """
+
+    main_task_lst_id = None
+    while not main_task_lst_id:
+        for taskList in task_lists['items']:
+
+            if main_task_lst_id:
+                break
+            if util.get_boolean_answer(MANAGE_THIS_LST_Q.format(list_title=taskList['title'])):
+                main_task_lst_id = taskList['id']
+
+        if not main_task_lst_id:
+            print(ANSWER_INVALID_MSG)
+    return main_task_lst_id
+
+
+def create_new_task_list():
+    """
+    creates a new google tasks list.
+    :return: the new task list id.
+    """
+    print(CREATE_NEW_TASKLST_MSG)
+    title = input(NEW_TASKLST_NAME_Q)
+    new_task_lst = {'title': title}
+    main_task_lst_id = util.services['tasks'].tasklists().insert(body=new_task_lst).execute()['id']
     return main_task_lst_id
 
 
@@ -139,7 +179,6 @@ def set_services():
     :return: a calendar with the app title and the service object as value.
     for example "calendar": service_calendar
     """
-    # changes
     with open(CRED_PKL_PATH, "rb") as creds:
         credentials = pickle.load(creds)
         service_calendar = build("calendar", "v3", credentials=credentials)
