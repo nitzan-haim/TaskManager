@@ -80,24 +80,25 @@ def get_next_free_busy():
     }
     events_result = util.services['calendar'].freebusy().query(body=body).execute()
     cal_dict = events_result['calendars']
-    return process_busy_info(cal_dict)
+
+    # process the busy information to represent the busy times neatly.
+    times_not_combined = cal_dict_to_busy_lst(cal_dict)
+    times_not_combined.sort(key=lambda elem: elem['start'])
+    result = combine_overlapping(times_not_combined)
+
+    return result
 
 
-def process_busy_info(cal_dict):
+def cal_dict_to_busy_lst(cal_dict):
     """
-    process the busy information to represent the busy times neatly.
-    1. convert values from strings to datetime objects
-    2. sort by start time
-    3. combine overlapping and adjacent busy times. two events are considered
-     adjacent if the time between them is less than 45 minutes.
+    get the busy times from the given dictionary and convert values from strings to datetime objects.
 
     :param cal_dict: dictionary of the form {calendar_id: {'busy':[{'start': X, 'end': Y}...]}}
     where X and Y are :type string.
-    :return: list of busy times sorted by the start time.
-     each element is of the form: {'start': X, 'end': Y}.
+    :return: list of busy times.
+    each element is of the form: {'start': X, 'end': Y}.
     X and Y :type: datetime
     """
-
     times_not_combined = []
     now = datetime.now()
     for calendar_id in cal_dict:
@@ -107,11 +108,21 @@ def process_busy_info(cal_dict):
                 continue
             times_not_combined.append({'start': util.string_to_datetime(b_t['start']),
                                        'end': util.string_to_datetime(b_t['end'])})
+    return times_not_combined
 
-    times_not_combined.sort(key=lambda elem: elem['start'])
 
+def combine_overlapping(times_not_combined):
+    """
+    combine overlapping and adjacent busy times. two events are considered
+     adjacent if the time between them is less than 45 minutes.
+    :param times_not_combined: list of busy times.
+    each element is of the form: {'start': X, 'end': Y}.
+    X and Y :type: datetime
+    :return: list of busy times after overlapping and adjacent times are combined.
+    each element is of the form: {'start': X, 'end': Y}.
+    X and Y :type: datetime
+    """
     result = []
-    # combine busy times
     i = 0
     n = len(times_not_combined)
     while i < n - 1:
@@ -130,7 +141,6 @@ def process_busy_info(cal_dict):
             i += 1  # skip the next busy time
 
         i += 1
-
     return result
 
 
@@ -150,14 +160,18 @@ def get_writing_calendar_next_events():
               timeMin=util.datetime_to_string(time_min),
               timeMax=util.datetime_to_string(time_max)).execute()
 
+    result = filter_whole_day_events(calendar_events)
+
+    return result
+
+
+def filter_whole_day_events(calendar_events):
     # keep only the events that have specific hours (leave out whole-day events):
     now = datetime.now()
     result = []
-
     for e in calendar_events['items']:
         if 'dateTime' in e['start'] and now <= util.string_to_datetime(e['end']['dateTime']):
             result.append(e['id'])
-
     return result
 
 
@@ -205,11 +219,9 @@ def plan_time_period(tasks, busy_times_lst, start_time):
 
             daily_earliest_work_time = datetime(start_time.year, start_time.month, start_time.day, 10, 0, 0)
             daily_latest_work_time = datetime(start_time.year, start_time.month, start_time.day, 20, 0, 0)
-            if start_time < daily_earliest_work_time:
-                # start planning from this day at 10 a.m
+            if start_time < daily_earliest_work_time: # start planning from this day at 10 a.m
                 start_time = daily_earliest_work_time
-            elif start_time >= daily_latest_work_time:
-                # start planning from 10 a.m the next day
+            elif start_time >= daily_latest_work_time:  # start planning from 10 a.m the next day
                 start_time = daily_earliest_work_time + timedelta(days=1)
                 continue
 
