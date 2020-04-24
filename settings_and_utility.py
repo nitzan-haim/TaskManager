@@ -5,6 +5,7 @@ from distutils.util import strtobool
 from datetime import datetime, timedelta
 
 # constants #
+INVALID_ANSWER_MSG = "your answer is unclear."
 
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 PLANNING_TIME_PERIOD = 10  # the time period in days that this program is planning for
@@ -36,7 +37,7 @@ def get_boolean_answer(question):
             answer = strtobool(input(question))
             answer_valid = True
         except ValueError:
-            print("your answer is unclear.")
+            print(INVALID_ANSWER_MSG)
 
     return answer
 
