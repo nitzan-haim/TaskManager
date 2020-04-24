@@ -85,22 +85,35 @@ def manage_existing_tasks(existing_tasks):
         keep_task = util.get_boolean_answer(KEEP_TASK_Q.format(task=summary))
         if keep_task or not util.get_boolean_answer(DELET_TASK_WARNING_Q):
             if util.get_boolean_answer(TASK_CHANGES_Q):
-                if util.get_boolean_answer(CHANGE_NAME_Q):
-                    summary = input(NEW_NAME_Q)
-                if util.get_boolean_answer(EDIT_DUE_DATE_Q.format(due=util.datetime_to_string(due_time))):
-                    due_time = maya.parse(input(NEW_DATE_Q)).datetime(to_timezone=util.TIME_ZONE,
-                                                             naive=True)
-                    due_time = due_time.replace(hour=23, minute=59)
-
-                if util.get_boolean_answer(EDIT_DURATION_Q.format(duration=duration)):
-
-                    duration = float(input(NEW_DURATION_Q))
-            updated_tasks.append([summary, due_time, duration, task_id])
+                t = edit_task(t)
+            updated_tasks.append(t)
         else:
             util.services['tasks'].tasks().delete(tasklist=util.task_list_id, task=task_id).execute()
 
     google_tasks_update(updated_tasks)
     return updated_tasks
+
+
+def edit_task(task):
+    """
+    edits the different task components according to the user's preferences.
+    :param task: the task to edit. list of the form: [summary, due_time, duration, task_id].
+    summary - name of the task :type string
+    due_time - due time of the task :type datetime object
+    duration - duration of the task :type timedelta object
+    task_id - id of the task in google calendar :type string
+    :return: list of the form [summary, due_time, duration, task_id] with the new task components.
+    """
+    [summary, due_time, duration, task_id] = task
+    if util.get_boolean_answer(CHANGE_NAME_Q):
+        summary = input(NEW_NAME_Q)
+    if util.get_boolean_answer(EDIT_DUE_DATE_Q.format(due=util.datetime_to_string(due_time))):
+        due_time = maya.parse(input(NEW_DATE_Q)).datetime(to_timezone=util.TIME_ZONE,
+                                                          naive=True)
+        due_time = due_time.replace(hour=23, minute=59)
+    if util.get_boolean_answer(EDIT_DURATION_Q.format(duration=duration)):
+        duration = float(input(NEW_DURATION_Q))
+    return [summary, due_time, duration, task_id]
 
 
 def google_tasks_update(modified_tasks):
