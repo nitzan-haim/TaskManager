@@ -7,7 +7,41 @@ import settings_and_utility as util
 import maya
 import os.path
 
+# constants
 TASKS_FILE_PATH = "tasks.pkl"
+
+# messages
+NO_TASKS_MSG = "you have no saved tasks."
+
+EXISTING_TASKS_MSG = "lets go over your existing tasks."
+
+# questions
+
+NEW_TASK_DURATION_Q = "how long will it take you to finish it (in minutes)?"
+
+NEW_TASK_DUE_Q = "what is the due date?"
+
+NEW_TASKS_TITLE_Q = "what is the title of the new task?"
+
+NEW_TASK_Q = "would you like to add a new task?"
+
+NEW_DURATION_Q = "what is the new duration in minutes? "
+
+NEW_DATE_Q = "what is the new due date?"
+
+NEW_NAME_Q = "what is the new name you would like to give it?"
+
+CHANGE_NAME_Q = "would you like to give this task a different name?"
+
+TASK_CHANGES_Q = "did anything about this task change since last time?"
+
+DELET_TASK_WARNING_Q = "are you sure you want to delete this task?"
+
+EDIT_DURATION_Q = "the current duration of this task is {duration} would you like to edit it?"
+
+KEEP_TASK_Q = "would you like to keep the task: {task} ?"
+
+EDIT_DUE_DATE_Q = "the current due date is {due} has it changes since last time?"
 
 
 def get_user_tasks():
@@ -42,28 +76,25 @@ def manage_existing_tasks(existing_tasks):
     """
     updated_tasks = []
     if not len(existing_tasks):
-        print("you have no saved tasks.")
+        print(NO_TASKS_MSG)
         return []
     else:
-        print("lets go over your existing tasks.")
+        print(EXISTING_TASKS_MSG)
     for t in existing_tasks:
         [summary, due_time, duration, task_id] = t
-        keep_task = util.get_boolean_answer("would you like to keep the task: " + summary + "?")
-        if keep_task or not util.get_boolean_answer("are you sure you want to delete this task?"):
-            if util.get_boolean_answer("did anything about this task change since last time?"):
-                if util.get_boolean_answer("would you like to give this task a different name?"):
-                    summary = input("what is the new name you would like to give it?")
-                if util.get_boolean_answer("the current due date is " +
-                                           util.datetime_to_string(due_time) +
-                                           ". has it changes since last time?"):
-                    due_time = maya.parse(input("what is the new due date?")).datetime(to_timezone=util.TIME_ZONE,
-                                                                                       naive=True)
+        keep_task = util.get_boolean_answer(KEEP_TASK_Q.format(task=summary))
+        if keep_task or not util.get_boolean_answer(DELET_TASK_WARNING_Q):
+            if util.get_boolean_answer(TASK_CHANGES_Q):
+                if util.get_boolean_answer(CHANGE_NAME_Q):
+                    summary = input(NEW_NAME_Q)
+                if util.get_boolean_answer(EDIT_DUE_DATE_Q.format(due=util.datetime_to_string(due_time))):
+                    due_time = maya.parse(input(NEW_DATE_Q)).datetime(to_timezone=util.TIME_ZONE,
+                                                             naive=True)
+                    due_time = due_time.replace(hour=23, minute=59)
 
-                if util.get_boolean_answer("the current duration of this task is " +
-                                           str(duration) +
-                                           ". would you like to edit it?"):
+                if util.get_boolean_answer(EDIT_DURATION_Q.format(duration=duration)):
 
-                    duration = float(input("what is the new duration in minutes? "))
+                    duration = float(input(NEW_DURATION_Q))
             updated_tasks.append([summary, due_time, duration, task_id])
         else:
             util.services['tasks'].tasks().delete(tasklist=util.task_list_id, task=task_id).execute()
@@ -94,10 +125,10 @@ def get_new_tasks():
     :return: list with the new tasks
     """
     new_tasks = []
-    while util.get_boolean_answer("would you like to add a new task?"):
-        summary = input("what is the title of the new task?")
-        due_time = maya.parse(input("what is the due date?")).datetime(to_timezone=util.TIME_ZONE, naive=True)
-        duration = timedelta(minutes=float(input("how long will it take you to finish it (in minutes)?")))
+    while util.get_boolean_answer(NEW_TASK_Q):
+        summary = input(NEW_TASKS_TITLE_Q)
+        due_time = maya.parse(input(NEW_TASK_DUE_Q)).datetime(to_timezone=util.TIME_ZONE, naive=True)
+        duration = timedelta(minutes=float(input(NEW_TASK_DURATION_Q)))
         task_id = create_task(summary, "", due_time)
         new_tasks.append([summary, due_time, duration, task_id])
 
