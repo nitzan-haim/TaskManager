@@ -4,12 +4,26 @@ from program_initial_setup import *
 from task_management import *
 from calendar_management import *
 
+# messages
+WELCOME_MSG = "welcome to your study time planner!"
+
+BYE_MSG = "done planning all tasks! Bye!"
+
+# questions
+WARNING_q = "please note that the planning will delete all the events in the " \
+              "study calendar from the time you specified and on." \
+            " \nwould you like to continue?"
+
+PLAN_FROM_NOW_Q = "start planning from now on? "
+
+START_TIME_Q = "what date and time would you like to start planning from? "
+
 
 def main():
     """
     manage google tasks and google calendar according to user's pereferences.
     """
-    print("welcome to your study time planner!")
+    print(WELCOME_MSG)
 
     set_settings()
     all_tasks = get_user_tasks()
@@ -21,7 +35,7 @@ def main():
     plan_time_period(all_tasks, free_busy, start)
     delete_future_events(future_events)
 
-    print("done planning all tasks! Bye!")
+    print(BYE_MSG)
 
 
 def get_start_time():
@@ -30,16 +44,11 @@ def get_start_time():
     :return: start time, :type: datetime object
     """
     start_time = datetime.now()
-    if not util.get_boolean_answer("start planning from now on? "):
-        start_time = maya.parse(input("what date and time would"
-                                      " you like to start planning "
-                                      "from? ")).datetime(to_timezone=util.TIME_ZONE,
-                                                          naive=True)
+    if not util.get_boolean_answer(PLAN_FROM_NOW_Q):
+        start_time = maya.parse(input(START_TIME_Q)).datetime(to_timezone=util.TIME_ZONE,
+                                                              naive=True)
 
-    print("please note that the planning will delete all the events in the "
-          "study calendar from the time you specified and on.")
-
-    if not util.get_boolean_answer("would you like to continue?"):
+    if not util.get_boolean_answer(WARNING_q):
         exit()
 
     return start_time
