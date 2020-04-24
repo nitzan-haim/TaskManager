@@ -8,16 +8,35 @@ from googleapiclient.discovery import build
 import settings_and_utility as util
 
 # constants
+SET_PREFERENCES_MSG = "first we will set your preferences."
+CLIENT_SECRET_JSON = "client_secret.json"
+TASKS_SCOPE = 'https://www.googleapis.com/auth/tasks'
+CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar'
 SETUP_PKL_PATH = "initial_setup.pkl"
-CALENDAR_CRED_PKL_PATH = "token.pkl"
-TASKS_CRED_PKL_PATH = "token_tasks.pkl"
+CRED_PKL_PATH = "token.pkl"
+
+# messages
+CHOOSE_TASKLIST_MSG = "now you will choose which task list you would like to manage using this app."
+CREATE_NEW_CALENDAT_MSG = "lets create a new calendar for that purpose."
+ANSWER_INVALID_MSG = "you did not answer positively for any option."
+DONE_INITIAL_SETUP_MSG = "great! we are done with the initial setup."
+CHOOSE_CALENDAT_MSG = "now you will choose the calendar that this app will manage."
+CREATE_NEW_TASKLST_MSG = "lets create a new task list then."
+
+# questions
+NEW_CALENDAR_NAME_Q = "what whould you like to name this calendar?"
+EXISTING_CALENDAR_Q = "do you have a google calendar that is dedicated for study time planning?"
+NEW_TASKLST_NAME_Q = "what would you like to call this list?"
+USE_EXISTING_TASKLST_Q = "do you wish to use an existing task list?"
+MANAGE_THIS_LST_Q = "would you like to manage the {list_title} list?"
+MANAGE_THIS_CALENDAR_Q = "would you like to set {calendar_name}to be the calendar that this app will manage?"
 
 
 def initial_setup():
     """
     set the programs' settings on the first use.
     """
-    print("first we will set your preferences.")
+    print(SET_PREFERENCES_MSG)
     initial_credentials_setup()
     set_services()
     util.write_calendar_id, util.reading_calendars_id = get_writing_reading_calendars()
@@ -27,29 +46,21 @@ def initial_setup():
                      "reading calendars": util.reading_calendars_id,
                      "task list id": task_list}
         pickle.dump(dump_dict, initial_setup_file)
-    print("great! we are done with the initial setup.")
+    print(DONE_INITIAL_SETUP_MSG)
 
 
 def initial_credentials_setup():
     """
     get the credentials of the google calendar and google task and dump them into pickle.
-    :return:
     """
-    if not os.path.exists(CALENDAR_CRED_PKL_PATH):
-        scopes = ['https://www.googleapis.com/auth/calendar']
-        flow = InstalledAppFlow.from_client_secrets_file("client_secret.json",
+# changes
+    if not os.path.exists(CRED_PKL_PATH):
+        scopes = [CALENDAR_SCOPE, TASKS_SCOPE]
+        flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_JSON,
                                                          scopes=scopes)
         credentials = flow.run_console()
-        with open(CALENDAR_CRED_PKL_PATH, "wb") as token:
+        with open(CRED_PKL_PATH, "wb") as token:
             pickle.dump(credentials, token)
-
-    if not os.path.exists(TASKS_CRED_PKL_PATH):
-        scopes = ['https://www.googleapis.com/auth/tasks']
-        flow = InstalledAppFlow.from_client_secrets_file("credentials.json",
-                                                         scopes=scopes)
-        credentials = flow.run_console()
-        with open(TASKS_CRED_PKL_PATH, "wb") as token_tasks:
-            pickle.dump(credentials, token_tasks)
 
 
 def get_writing_reading_calendars():
@@ -60,9 +71,9 @@ def get_writing_reading_calendars():
      writing calendar id :type string
      reading calendars ids :type: list of strings.
     """
-    print("now you will choose the calendar that this app will manage.")
+    print(CHOOSE_CALENDAT_MSG)
     existing_calendars = util.services['calendar'].calendarList().list().execute()
-    if util.get_boolean_answer("do you have a google calendar that is dedicated for study time planning?"):
+    if util.get_boolean_answer(EXISTING_CALENDAR_Q):
         write_calendar = None
         reading_calendars = []
         while not write_calendar:
@@ -71,19 +82,17 @@ def get_writing_reading_calendars():
                 name = existing_calendars['items'][i]['summary']
 
                 if not write_calendar:  # choose the write calendar
-                    if util.get_boolean_answer("would you like to set " + name +
-                                               " to be the calendar that this app "
-                                               "will manage?"):
+                    if util.get_boolean_answer(MANAGE_THIS_CALENDAR_Q.format(calendar_name=name)):
                         write_calendar = cal_id
 
                 else:   # write calendar already chosen
                     reading_calendars.append(cal_id)
 
             if not write_calendar:
-                print("you did not answer positively for any calendar.")
+                print(ANSWER_INVALID_MSG)
     else:
-        print("lets create a new calendar for that purpose.")
-        summary = input("what whould you like to name this calendar?")
+        print(CREATE_NEW_CALENDAT_MSG)
+        summary = input(NEW_CALENDAR_NAME_Q)
         new_calendar = {
             'summary': summary,
             'timeZone': util.TIME_ZONE
@@ -100,9 +109,9 @@ def get_main_task_lst_id():
     get the task list id. wither use an existing one or create a new one.
     :return:
     """
-    print("now you will choose which task list you would like to manage using this app.")
+    print(CHOOSE_TASKLIST_MSG)
     result = util.services['tasks'].tasklists().list().execute()
-    if util.get_boolean_answer("do you wish to use an existing task list?"):
+    if util.get_boolean_answer(USE_EXISTING_TASKLST_Q):
         main_task_lst_id = None
 
         while not main_task_lst_id:
@@ -110,15 +119,14 @@ def get_main_task_lst_id():
 
                 if main_task_lst_id:
                     break
-
-                if util.get_boolean_answer("would you like to manage the " + taskList['title'] + " list?"):
+                if util.get_boolean_answer(MANAGE_THIS_LST_Q.format(list_title=taskList['title'])):
                         main_task_lst_id = taskList['id']
 
             if not main_task_lst_id:
-                print("you did not answer positively for any task list.")
+                print(ANSWER_INVALID_MSG)
     else:
-        print("lets create a new task list then.")
-        title = input("what would you like to call this list?")
+        print(CREATE_NEW_TASKLST_MSG)
+        title = input(NEW_TASKLST_NAME_Q)
         new_task_lst = {'title': title}
         main_task_lst_id = util.services['tasks'].tasklists().insert(body=new_task_lst).execute()['id']
 
@@ -131,12 +139,10 @@ def set_services():
     :return: a calendar with the app title and the service object as value.
     for example "calendar": service_calendar
     """
-    with open(CALENDAR_CRED_PKL_PATH, "rb") as calender_creds:
-        credentials_calendar = pickle.load(calender_creds)
-        service_calendar = build("calendar", "v3", credentials=credentials_calendar)
-
-    with open(TASKS_CRED_PKL_PATH, "rb") as tasks_creds:
-        credentials_tasks = pickle.load(tasks_creds)
-        service_tasks = build("tasks", "v1", credentials=credentials_tasks)
-
+    # changes
+    with open(CRED_PKL_PATH, "rb") as creds:
+        credentials = pickle.load(creds)
+        service_calendar = build("calendar", "v3", credentials=credentials)
+        service_tasks = build("tasks", "v1", credentials=credentials)
         util.services = {'calendar': service_calendar, 'tasks': service_tasks}
+
