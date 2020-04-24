@@ -4,6 +4,13 @@
 import settings_and_utility as util
 from datetime import datetime, timedelta
 
+# messages
+PLANNING_MSG = "planning and updating your calendar..."
+
+COULD_NOT_FIT_MSG = "sorry, the due date of {summary} is too close.\nwe planned for you " \
+                    " {actual_duration} to spend on this task.\nwe could not fit " \
+                    "{remaining_time} before the due time."
+
 
 def create_event(summary, day, hour, minutes, sec=0,
                  duration=util.timedelta(minutes=60),
@@ -63,7 +70,7 @@ def get_next_free_busy():
 
     now = datetime.now()
     time_min = datetime(now.year, now.month, now.day, 0, 0, 0)  # start reading from the beginning of today
-    time_max = datetime(now.year, now.month, now.day + util.PLANNING_TIME_PERIOD + 1, 0, 0, 0)
+    time_max = time_min + timedelta(days=util.PLANNING_TIME_PERIOD)
 
     body = {
         "timeMin": time_min.strftime(util.TIME_FORMAT + '+03:00'),
@@ -136,7 +143,7 @@ def get_writing_calendar_next_events():
     time_min = datetime(now.year, now.month, now.day, 0, 0, 0)  # start reading from the beginning of today
     time_max = time_min + timedelta(days=util.PLANNING_TIME_PERIOD)
 
-    calendar_events = util.services['calendar'].events()\
+    calendar_events = util.services['calendar'].events() \
         .list(calendarId=util.write_calendar_id,
               maxResults=1000,
               singleEvents=True,
@@ -176,9 +183,10 @@ def plan_time_period(tasks, busy_times_lst, start_time):
     :param start_time: the time of which to start the planning from.
     :type: datetime object.
     """
-    print("planning and updating your calendar...")
+    print(PLANNING_MSG)
     planning_period_end = datetime(start_time.year, start_time.month,
-                                   start_time.day + util.PLANNING_TIME_PERIOD, 21, 0, 0)
+                                   start_time.day, 21, 0, 0) + \
+                                   timedelta(days=util.PLANNING_TIME_PERIOD)
     done_planning = False
     i = 0  # idx of busy_times_lst
 
@@ -232,9 +240,9 @@ def plan_time_period(tasks, busy_times_lst, start_time):
             start_time += event_duration
 
             if start_time > due_date:
-                print("sorry, the due date of ", summary, "is too close.")
-                print("we planned for you ", actual_duration, "to spend on this task.")
-                print("we could not fit ", task_duration - actual_duration, " before the due time.")
+                print(COULD_NOT_FIT_MSG.format(summary=summary,
+                                               actual_duration=actual_duration,
+                                               remaining_time=task_duration - actual_duration))
                 actual_duration = task_duration  # move on to next task
 
 
